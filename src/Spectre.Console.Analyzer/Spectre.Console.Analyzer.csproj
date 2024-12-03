@@ -3,6 +3,7 @@
   <PropertyGroup>
     <Description>Best practice analyzers for Spectre.Console.</Description>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
     <IsPackable>true</IsPackable>
     <DevelopmentDependency>true</DevelopmentDependency>
     <IncludeBuildOutput>false</IncludeBuildOutput>
@@ -10,7 +11,9 @@
     <NoPackageAnalysis>true</NoPackageAnalysis>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
   </PropertyGroup>
-
+  <ItemGroup>
+    <CompilerVisibleProperty Include="PublishAot" />
+  </ItemGroup>
   <ItemGroup>
     <AdditionalFiles Include="..\stylecop.json" Link="Properties/stylecop.json"/>
   </ItemGroup>

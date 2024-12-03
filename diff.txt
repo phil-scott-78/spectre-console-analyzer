@@ -1,0 +1,615 @@
+diff --git a/global.json b/global.json
+index 11679f8..6a00e00 100644
+--- a/global.json
++++ b/global.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "http://json.schemastore.org/global",
+   "sdk": {
+-    "version": "8.0.204",
++    "version": "9.0.100",
+     "rollForward": "latestFeature"
+   }
+ }
+diff --git a/src/Spectre.Console.Analyzer.Sandbox/Program.cs b/src/Spectre.Console.Analyzer.Sandbox/Program.cs
+index 65463c4..3ff357e 100644
+--- a/src/Spectre.Console.Analyzer.Sandbox/Program.cs
++++ b/src/Spectre.Console.Analyzer.Sandbox/Program.cs
+@@ -1,3 +1,9 @@
++using System.Collections;
++using System.Collections.Generic;
++using System.IO;
++using System.Linq;
++using Spectre.Console.Cli;
++
+ namespace Spectre.Console.Analyzer.Sandbox;
+ 
+ /// <summary>
+@@ -12,4 +18,22 @@ public static class Program
+     {
+         AnsiConsole.WriteLine("Project is set up with a reference to Spectre.Console.Analyzer");
+     }
++}
++
++internal class Settings : CommandSettings
++{
++    [CommandArgument(0, "<PROGRAM>", typeof(DirectoryInfo))]
++    public FileInfo Foo { get; set; }
++
++    [CommandArgument(1, "<PROGRAM>")]
++    public ILookup<string, int> Bar3 { get; set; }
++
++    [CommandArgument(2, "<PROGRAM>")]
++    public MemoryStream Stream { get; set; }
++
++    [CommandArgument(1, "<PROGRAM>")]
++    public int Name { get; set; }
++
++    [CommandOption("-h|--help")]
++    public FileInfo Bar { get; set; }
+ }
+\ No newline at end of file
+diff --git a/src/Spectre.Console.Analyzer.Sandbox/Spectre.Console.Analyzer.Sandbox.csproj b/src/Spectre.Console.Analyzer.Sandbox/Spectre.Console.Analyzer.Sandbox.csproj
+index b05e55b..8469568 100644
+--- a/src/Spectre.Console.Analyzer.Sandbox/Spectre.Console.Analyzer.Sandbox.csproj
++++ b/src/Spectre.Console.Analyzer.Sandbox/Spectre.Console.Analyzer.Sandbox.csproj
+@@ -3,16 +3,15 @@
+   <PropertyGroup>
+     <OutputType>Exe</OutputType>
+     <TargetFramework>net8.0</TargetFramework>
++    <PublishAot>true</PublishAot>
+   </PropertyGroup>
+-
+   <ItemGroup>
+     <AdditionalFiles Include="..\stylecop.json" Link="Properties/stylecop.json" />
+   </ItemGroup>
+   <ItemGroup>
+     <ProjectReference Include="..\Spectre.Console.Analyzer\Spectre.Console.Analyzer.csproj" PrivateAssets="all" ReferenceOutputAssembly="false" OutputItemType="Analyzer" />
+-  </ItemGroup>
+-  <ItemGroup>
+-    <PackageReference Include="Spectre.Console" Version="0.49.1" />
++    <ProjectReference Include="..\..\..\spectre.console\src\Spectre.Console.Cli\Spectre.Console.Cli.csproj" />
++    <ProjectReference Include="..\..\..\spectre.console\src\Spectre.Console\Spectre.Console.csproj" />
+   </ItemGroup>
+ 
+ </Project>
+diff --git a/src/Spectre.Console.Analyzer.Tests/CodeAnalyzerHelper.cs b/src/Spectre.Console.Analyzer.Tests/CodeAnalyzerHelper.cs
+index 860fcc8..18e9066 100644
+--- a/src/Spectre.Console.Analyzer.Tests/CodeAnalyzerHelper.cs
++++ b/src/Spectre.Console.Analyzer.Tests/CodeAnalyzerHelper.cs
+@@ -1,3 +1,5 @@
++using Spectre.Console.Cli;
++
+ namespace Spectre.Console.Analyzer.Tests;
+ 
+ internal static class CodeAnalyzerHelper
+@@ -6,7 +8,11 @@ internal static class CodeAnalyzerHelper
+ 
+     static CodeAnalyzerHelper()
+     {
+-        CurrentSpectre = ReferenceAssemblies.Net.Net60.AddAssemblies(
+-            ImmutableArray.Create(typeof(AnsiConsole).Assembly.Location.Replace(".dll", string.Empty)));
++        CurrentSpectre = ReferenceAssemblies.Net.Net90.AddAssemblies(
++            ImmutableArray.Create(
++                [
++                    typeof(AnsiConsole).Assembly.Location.Replace(".dll", string.Empty),
++                    typeof(CommandApp).Assembly.Location.Replace(".dll", string.Empty)
++                ]));
+     }
+ }
+diff --git a/src/Spectre.Console.Analyzer.Tests/Properties/Usings.cs b/src/Spectre.Console.Analyzer.Tests/Properties/Usings.cs
+index 394e6fe..0900465 100644
+--- a/src/Spectre.Console.Analyzer.Tests/Properties/Usings.cs
++++ b/src/Spectre.Console.Analyzer.Tests/Properties/Usings.cs
+@@ -9,7 +9,6 @@ global using Microsoft.CodeAnalysis.CodeFixes;
+ global using Microsoft.CodeAnalysis.CSharp.Testing;
+ global using Microsoft.CodeAnalysis.Diagnostics;
+ global using Microsoft.CodeAnalysis.Testing;
+-global using Microsoft.CodeAnalysis.Testing.Verifiers;
+ global using Microsoft.VisualStudio.Composition;
+ global using Spectre.Console.Analyzer.FixProviders;
+ global using Xunit;
+\ No newline at end of file
+diff --git a/src/Spectre.Console.Analyzer.Tests/Spectre.Console.Analyzer.Tests.csproj b/src/Spectre.Console.Analyzer.Tests/Spectre.Console.Analyzer.Tests.csproj
+index 61c1be4..d02ac4f 100644
+--- a/src/Spectre.Console.Analyzer.Tests/Spectre.Console.Analyzer.Tests.csproj
++++ b/src/Spectre.Console.Analyzer.Tests/Spectre.Console.Analyzer.Tests.csproj
+@@ -1,28 +1,35 @@
+ <Project Sdk="Microsoft.NET.Sdk">
+ 
+   <PropertyGroup>
+-    <TargetFramework>net6.0</TargetFramework>
++    <TargetFramework>net9.0</TargetFramework>
+     <IsPackable>false</IsPackable>
+   </PropertyGroup>
+ 
+   <ItemGroup>
+     <AdditionalFiles Include="..\..\src\stylecop.json" Link="Properties/stylecop.json" />
+   </ItemGroup>
++  <ItemGroup>
++    <!-- Microsoft.CodeAnalysis.CSharp.Analyzer.Testing relies on System.Formats.Asn1 5.0.0 which has this vulnerability. Nothing we expose, so suppress.  -->
++    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-447r-wph3-92pm" />
++  </ItemGroup>
+ 
+   <ItemGroup>
+-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing.XUnit" Version="1.1.1" />
+-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing.XUnit" Version="1.1.1" />
+-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.8.0" />
+-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.8.0" />
+-    <PackageReference Include="Spectre.Console" Version="0.49.1" />
+-    <PackageReference Include="xunit" Version="2.6.6" />
+-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.6">
++    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Analyzer.Testing" Version="1.1.2" />
++    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.CodeFix.Testing" Version="1.1.2" />
++    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="4.11.0" />
++    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />
++    <PackageReference Include="xunit" Version="2.9.2" />
++    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2">
+       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+       <PrivateAssets>all</PrivateAssets>
+     </PackageReference>
++    <PackageReference Update="Roslynator.Analyzers" Version="4.12.9" />
++    <PackageReference Update="MinVer" Version="6.0.0" />
+   </ItemGroup>
+ 
+   <ItemGroup>
++    <ProjectReference Include="..\..\..\spectre.console\src\Spectre.Console.Cli\Spectre.Console.Cli.csproj" />
++    <ProjectReference Include="..\..\..\spectre.console\src\Spectre.Console\Spectre.Console.csproj" />
+     <ProjectReference Include="..\Spectre.Console.Analyzer\Spectre.Console.Analyzer.csproj" />
+   </ItemGroup>
+ 
+diff --git a/src/Spectre.Console.Analyzer.Tests/SpectreAnalyzerVerifier.cs b/src/Spectre.Console.Analyzer.Tests/SpectreAnalyzerVerifier.cs
+index eb333f2..01cfbfb 100644
+--- a/src/Spectre.Console.Analyzer.Tests/SpectreAnalyzerVerifier.cs
++++ b/src/Spectre.Console.Analyzer.Tests/SpectreAnalyzerVerifier.cs
+@@ -1,15 +1,23 @@
++using Microsoft.CodeAnalysis.CSharp;
++using Microsoft.CodeAnalysis.Options;
++
+ namespace Spectre.Console.Analyzer.Tests;
+ 
+ public static class SpectreAnalyzerVerifier<TAnalyzer>
+     where TAnalyzer : DiagnosticAnalyzer, new()
+ {
++    public static Task VerifyCodeFixAsync(string source, DiagnosticResult expected, string fixedSource, Dictionary<string, string> globalOptions)
++        => VerifyCodeFixAsync(source, OutputKind.DynamicallyLinkedLibrary, new[] { expected }, fixedSource, globalOptions);
++
+     public static Task VerifyCodeFixAsync(string source, DiagnosticResult expected, string fixedSource)
+-        => VerifyCodeFixAsync(source, OutputKind.DynamicallyLinkedLibrary, new[] { expected }, fixedSource);
++        => VerifyCodeFixAsync(source, OutputKind.DynamicallyLinkedLibrary, new[] { expected }, fixedSource, new Dictionary<string, string>());
+ 
+-    public static Task VerifyCodeFixAsync(string source, OutputKind outputKind, DiagnosticResult expected, string fixedSource)
+-        => VerifyCodeFixAsync(source, outputKind, new[] { expected }, fixedSource);
++    public static Task VerifyCodeFixAsync(string source, OutputKind outputKind, DiagnosticResult expected,
++        string fixedSource)
++        => VerifyCodeFixAsync(source, outputKind, new[] { expected }, fixedSource, new Dictionary<string, string>());
+ 
+-    private static Task VerifyCodeFixAsync(string source, OutputKind outputKind, IEnumerable<DiagnosticResult> expected, string fixedSource)
++    private static Task VerifyCodeFixAsync(string source, OutputKind outputKind, IEnumerable<DiagnosticResult> expected,
++        string fixedSource, Dictionary<string, string> globalOptions)
+     {
+         var test = new Test
+         {
+@@ -18,6 +26,7 @@ public static class SpectreAnalyzerVerifier<TAnalyzer>
+             {
+                 OutputKind = outputKind,
+             },
++            GlobalOptions = globalOptions,
+             FixedCode = fixedSource,
+         };
+ 
+@@ -26,11 +35,17 @@ public static class SpectreAnalyzerVerifier<TAnalyzer>
+     }
+ 
+     public static Task VerifyAnalyzerAsync(string source, params DiagnosticResult[] expected)
++    {
++        return VerifyAnalyzerAsync(source, new Dictionary<string, string>(), expected);
++    }
++
++    public static Task VerifyAnalyzerAsync(string source, Dictionary<string, string> globalOptions, params DiagnosticResult[] expected)
+     {
+         var test = new Test
+         {
+             TestCode = source,
+             CompilerDiagnostics = CompilerDiagnostics.All,
++            GlobalOptions = globalOptions,
+         };
+ 
+         test.ExpectedDiagnostics.AddRange(expected);
+@@ -39,20 +54,28 @@ public static class SpectreAnalyzerVerifier<TAnalyzer>
+ 
+     // Code fix tests support both analyzer and code fix testing. This test class is derived from the code fix test
+     // to avoid the need to maintain duplicate copies of the customization work.
+-    private class Test : CSharpCodeFixTest<TAnalyzer, EmptyCodeFixProvider, XUnitVerifier>
++    private class Test : CSharpCodeFixTest<TAnalyzer, EmptyCodeFixProvider, DefaultVerifier>
+     {
++        public Dictionary<string, string> GlobalOptions { get; init; } = new();
++
+         public Test()
+         {
+             ReferenceAssemblies = CodeAnalyzerHelper.CurrentSpectre;
+             TestBehaviors |= TestBehaviors.SkipGeneratedCodeCheck;
+         }
+ 
++        protected override AnalyzerOptions GetAnalyzerOptions(Project project)
++        {
++            return new AnalyzerOptions([], new TestAnalyzerConfigOptionsProvider(GlobalOptions));
++        }
++
+         protected override IEnumerable<CodeFixProvider> GetCodeFixProviders()
+         {
+             var analyzer = new TAnalyzer();
+             foreach (var provider in CodeFixProviderDiscovery.GetCodeFixProviders(Language))
+             {
+-                if (analyzer.SupportedDiagnostics.Any(diagnostic => provider.FixableDiagnosticIds.Contains(diagnostic.Id)))
++                if (analyzer.SupportedDiagnostics.Any(diagnostic =>
++                        provider.FixableDiagnosticIds.Contains(diagnostic.Id)))
+                 {
+                     yield return provider;
+                 }
+@@ -60,3 +83,25 @@ public static class SpectreAnalyzerVerifier<TAnalyzer>
+         }
+     }
+ }
++
++/// <summary>
++/// Custom analyzer config options provider to allow us to test the analyzer when EnableAot is enabled or not.
++/// </summary>
++/// <param name="globalOptions">The global options to set.</param>
++internal class TestAnalyzerConfigOptionsProvider(Dictionary<string, string> globalOptions)
++    : AnalyzerConfigOptionsProvider
++{
++    private readonly TestAnalyzerConfigOptions _globalOptions = new(globalOptions);
++
++    public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
++    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => new TestAnalyzerConfigOptions();
++    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => new TestAnalyzerConfigOptions();
++}
++
++internal class TestAnalyzerConfigOptions(Dictionary<string, string> options = null) : AnalyzerConfigOptions
++{
++    private readonly Dictionary<string, string> _options = options ?? new Dictionary<string, string>();
++
++    public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value);
++    public override IEnumerable<string> Keys => _options.Keys;
++}
+\ No newline at end of file
+diff --git a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoConcurrentLiveRenderablesTests.cs b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoConcurrentLiveRenderablesTests.cs
+index 423ba05..df2e96a 100644
+--- a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoConcurrentLiveRenderablesTests.cs
++++ b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoConcurrentLiveRenderablesTests.cs
+@@ -7,7 +7,7 @@ public class NoCurrentLiveRenderablesTests
+         DiagnosticSeverity.Warning);
+ 
+     [Fact]
+-    public async void Status_call_within_live_call_warns()
++    public async Task Status_call_within_live_call_warns()
+     {
+         const string Source = @"
+ using Spectre.Console;
+@@ -18,17 +18,20 @@ class TestClass
+     {
+         AnsiConsole.Live(new Table()).Start(ctx =>
+         {
+-            AnsiConsole.Status().Start(""go"", innerCtx => {});
++            [|AnsiConsole.Status().Start(""go"", innerCtx => {})|];
+         });
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<NoConcurrentLiveRenderablesAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(10, 13));
++            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
++            {
++                { "build_property.enableaotanalyzer", "true" },
++            });
+     }
+ 
+     [Fact]
+-    public async void Status_call_within_live_call_warns_with_instance()
++    public async Task Status_call_within_live_call_warns_with_instance()
+     {
+         const string Source = @"
+ using Spectre.Console;
+@@ -41,17 +44,17 @@ class Child
+     {
+         _console.Status().Start(""starting"", context =>
+         {
+-            _console.Progress().Start(progressContext => { });
++            [|_console.Progress().Start(progressContext => { })|];
+         });
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<NoConcurrentLiveRenderablesAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(12, 13));
++            .VerifyAnalyzerAsync(Source);
+     }
+ 
+     [Fact]
+-    public async void Calling_start_on_non_live_renderable_has_no_warning()
++    public async Task Calling_start_on_non_live_renderable_has_no_warning()
+     {
+         const string Source = @"
+ using Spectre.Console;
+diff --git a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoPromptsDuringLiveRenderablesTests.cs b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoPromptsDuringLiveRenderablesTests.cs
+index c08e79e..a82827e 100644
+--- a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoPromptsDuringLiveRenderablesTests.cs
++++ b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/NoPromptsDuringLiveRenderablesTests.cs
+@@ -21,7 +21,10 @@ class TestClass
+ }";
+ 
+         await SpectreAnalyzerVerifier<NoPromptsDuringLiveRenderablesAnalyzer>
+-            .VerifyAnalyzerAsync(Source);
++            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
++            {
++                { "build_property.enableaotanalyzer", "true" },
++            });
+     }
+ 
+     [Fact]
+@@ -38,13 +41,13 @@ class TestClass
+     {
+         _console.Status().Start(""starting"", context =>
+         {
+-            var result = _console.Confirm(""we ok?"");
++            var result = [|_console.Confirm(""we ok?"")|];
+         });
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<NoPromptsDuringLiveRenderablesAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(12, 26));
++            .VerifyAnalyzerAsync(Source);
+     }
+ 
+     [Fact]
+@@ -59,13 +62,13 @@ class TestClass
+     {
+         AnsiConsole.Progress().Start(_ =>
+         {
+-            AnsiConsole.Ask<string>(""How are you?"");
++            [|AnsiConsole.Ask<string>(""How are you?"")|];
+         });
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<NoPromptsDuringLiveRenderablesAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(10, 13));
++            .VerifyAnalyzerAsync(Source);
+     }
+ 
+     [Fact]
+diff --git a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseInstanceAnsiConsoleTests.cs b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseInstanceAnsiConsoleTests.cs
+index 6845019..0b72321 100644
+--- a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseInstanceAnsiConsoleTests.cs
++++ b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseInstanceAnsiConsoleTests.cs
+@@ -7,7 +7,7 @@ public class FavorInstanceAnsiConsoleOverStaticAnalyzerTests
+         DiagnosticSeverity.Info);
+ 
+     [Fact]
+-    public async void Should_only_warn_within_methods()
++    public async Task Should_only_warn_within_methods()
+     {
+         const string Source = @"
+ using Spectre.Console;
+@@ -28,7 +28,7 @@ internal sealed class Foo
+     }
+ 
+     [Fact]
+-    public async void Instance_console_has_no_warnings()
++    public async Task Instance_console_has_no_warnings()
+     {
+         const string Source = @"
+ using Spectre.Console;
+@@ -48,7 +48,7 @@ class TestClass
+     }
+ 
+     [Fact]
+-    public async void Static_console_with_no_instance_variables_has_no_warnings()
++    public async Task Static_console_with_no_instance_variables_has_no_warnings()
+     {
+         const string Source = @"
+ using Spectre.Console;
+@@ -66,7 +66,7 @@ class TestClass
+     }
+ 
+     [Fact]
+-    public async void Console_Write_Has_Warning()
++    public async Task Console_Write_Has_Warning()
+     {
+         const string Source = @"
+ using Spectre.Console;
+@@ -78,11 +78,11 @@ class TestClass
+     void TestMethod()
+     {
+         _ansiConsole.Write(""this is fine"");
+-        AnsiConsole.Write(""Hello, World"");
++        [|AnsiConsole.Write(""Hello, World"")|];
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<FavorInstanceAnsiConsoleOverStaticAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(11, 9));
++            .VerifyAnalyzerAsync(Source);
+     }
+ }
+diff --git a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseSpectreInsteadOfSystemConsoleAnalyzerTests.cs b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseSpectreInsteadOfSystemConsoleAnalyzerTests.cs
+index 094315f..f35e875 100644
+--- a/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseSpectreInsteadOfSystemConsoleAnalyzerTests.cs
++++ b/src/Spectre.Console.Analyzer.Tests/Unit/Analyzers/UseSpectreInsteadOfSystemConsoleAnalyzerTests.cs
+@@ -7,7 +7,7 @@ public class UseSpectreInsteadOfSystemConsoleAnalyzerTests
+         DiagnosticSeverity.Warning);
+ 
+     [Fact]
+-    public async void Non_configured_SystemConsole_methods_report_no_warnings()
++    public async Task Non_configured_SystemConsole_methods_report_no_warnings()
+     {
+         const string Source = @"
+ using System;
+@@ -20,11 +20,14 @@ class TestClass {
+ }";
+ 
+         await SpectreAnalyzerVerifier<UseSpectreInsteadOfSystemConsoleAnalyzer>
+-            .VerifyAnalyzerAsync(Source);
++            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
++            {
++                { "build_property.enableaotanalyzer", "true" },
++            });
+     }
+ 
+     [Fact]
+-    public async void Console_Write_Has_Warning()
++    public async Task Console_Write_Has_Warning()
+     {
+         const string Source = @"
+ using System;
+@@ -32,16 +35,19 @@ using System;
+ class TestClass {
+     void TestMethod()
+     {
+-        Console.Write(""Hello, World"");
++        [|Console.Write(""Hello, World"")|];
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<UseSpectreInsteadOfSystemConsoleAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(7, 9));
++            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
++            {
++                { "build_property.enableaotanalyzer", "true" },
++            });
+     }
+ 
+     [Fact]
+-    public async void Console_WriteLine_Has_Warning()
++    public async Task Console_WriteLine_Has_Warning()
+     {
+         const string Source = @"
+ using System;
+@@ -49,11 +55,11 @@ using System;
+ class TestClass
+ {
+     void TestMethod() {
+-        Console.WriteLine(""Hello, World"");
++        [|Console.WriteLine(""Hello, World"")|];
+     }
+ }";
+ 
+         await SpectreAnalyzerVerifier<UseSpectreInsteadOfSystemConsoleAnalyzer>
+-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(7, 9));
++            .VerifyAnalyzerAsync(Source);
+     }
+ }
+diff --git a/src/Spectre.Console.Analyzer.sln b/src/Spectre.Console.Analyzer.sln
+index a31590b..09cc4c8 100644
+--- a/src/Spectre.Console.Analyzer.sln
++++ b/src/Spectre.Console.Analyzer.sln
+@@ -15,6 +15,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Build", "Build", "{A60B6F7B
+ 		Directory.Build.targets = Directory.Build.targets
+ 	EndProjectSection
+ EndProject
++Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Spectre.Console.Cli", "..\..\spectre.console\src\Spectre.Console.Cli\Spectre.Console.Cli.csproj", "{91008390-BBBB-44F2-8612-78F1AEC91078}"
++EndProject
++Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Spectre.Console", "..\..\spectre.console\src\Spectre.Console\Spectre.Console.csproj", "{2BD63E73-CC16-4B65-AAB9-EBCA95869067}"
++EndProject
+ Global
+ 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+ 		Debug|Any CPU = Debug|Any CPU
+@@ -61,6 +65,30 @@ Global
+ 		{609D5D1B-D904-4A31-B237-A04B49910166}.Release|x64.Build.0 = Release|Any CPU
+ 		{609D5D1B-D904-4A31-B237-A04B49910166}.Release|x86.ActiveCfg = Release|Any CPU
+ 		{609D5D1B-D904-4A31-B237-A04B49910166}.Release|x86.Build.0 = Release|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Debug|Any CPU.Build.0 = Debug|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Debug|x64.ActiveCfg = Debug|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Debug|x64.Build.0 = Debug|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Debug|x86.Build.0 = Debug|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Release|Any CPU.ActiveCfg = Release|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Release|Any CPU.Build.0 = Release|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Release|x64.ActiveCfg = Release|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Release|x64.Build.0 = Release|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Release|x86.ActiveCfg = Release|Any CPU
++		{91008390-BBBB-44F2-8612-78F1AEC91078}.Release|x86.Build.0 = Release|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Debug|Any CPU.Build.0 = Debug|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Debug|x64.ActiveCfg = Debug|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Debug|x64.Build.0 = Debug|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Debug|x86.ActiveCfg = Debug|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Debug|x86.Build.0 = Debug|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Release|Any CPU.ActiveCfg = Release|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Release|Any CPU.Build.0 = Release|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Release|x64.ActiveCfg = Release|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Release|x64.Build.0 = Release|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Release|x86.ActiveCfg = Release|Any CPU
++		{2BD63E73-CC16-4B65-AAB9-EBCA95869067}.Release|x86.Build.0 = Release|Any CPU
+ 	EndGlobalSection
+ 	GlobalSection(SolutionProperties) = preSolution
+ 		HideSolutionNode = FALSE
+diff --git a/src/Spectre.Console.Analyzer/Descriptors.cs b/src/Spectre.Console.Analyzer/Descriptors.cs
+index 592a6df..e86db1d 100644
+--- a/src/Spectre.Console.Analyzer/Descriptors.cs
++++ b/src/Spectre.Console.Analyzer/Descriptors.cs
+@@ -73,4 +73,37 @@ public static class Descriptors
+             Usage,
+             Warning,
+             "Avoid prompting for input while a current renderable is running.");
++
++    /// <summary>
++    /// Gets definitions of diagnostics Spectre1050.
++    /// </summary>
++    public static DiagnosticDescriptor S1050_AotRequiresType { get; } =
++        Rule(
++            "Spectre1050",
++            "Types must be explicitly defined when using non-intrinsic properties while publishing in AOT.",
++            Usage,
++            Warning,
++            "Types must be explicitly defined on CommandArgument or CommandOption when using non-intrinsic properties while publish in AOT. ");
++
++    /// <summary>
++    /// Gets definitions of diagnostics Spectre1051.
++    /// </summary>
++    public static DiagnosticDescriptor S1051_AotRequiresMatchTypes { get; } =
++        Rule(
++            "Spectre1051",
++            "Type must match the property type.",
++            Usage,
++            Warning,
++            "Type must match the property type. {0} expected {1}, found {2}");
++
++    /// <summary>
++    /// Gets definitions of diagnostics Spectre1052.
++    /// </summary>
++    public static DiagnosticDescriptor S1052_InvalidCommandSettingPropertyType { get; } =
++        Rule(
++            id: "S1052",
++            title: "Invalid property type for CommandArgument or CommandOption",
++            Usage,
++            Error,
++            messageFormat: "The property '{0}' of type '{1}' is not a valid option type for Spectre.Console commands. {2}");
+ }
+\ No newline at end of file
+diff --git a/src/Spectre.Console.Analyzer/Spectre.Console.Analyzer.csproj b/src/Spectre.Console.Analyzer/Spectre.Console.Analyzer.csproj
+index c7e9f3c..028f8b7 100644
+--- a/src/Spectre.Console.Analyzer/Spectre.Console.Analyzer.csproj
++++ b/src/Spectre.Console.Analyzer/Spectre.Console.Analyzer.csproj
+@@ -3,6 +3,7 @@
+   <PropertyGroup>
+     <Description>Best practice analyzers for Spectre.Console.</Description>
+     <TargetFramework>netstandard2.0</TargetFramework>
++    <LangVersion>latest</LangVersion>
+     <IsPackable>true</IsPackable>
+     <DevelopmentDependency>true</DevelopmentDependency>
+     <IncludeBuildOutput>false</IncludeBuildOutput>
+@@ -10,7 +11,9 @@
+     <NoPackageAnalysis>true</NoPackageAnalysis>
+     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+   </PropertyGroup>
+-
++  <ItemGroup>
++    <CompilerVisibleProperty Include="PublishAot" />
++  </ItemGroup>
+   <ItemGroup>
+     <AdditionalFiles Include="..\stylecop.json" Link="Properties/stylecop.json"/>
+   </ItemGroup>

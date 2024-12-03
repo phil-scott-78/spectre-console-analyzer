@@ -7,7 +7,7 @@ public class NoCurrentLiveRenderablesTests
         DiagnosticSeverity.Warning);
 
     [Fact]
-    public async void Status_call_within_live_call_warns()
+    public async Task Status_call_within_live_call_warns()
     {
         const string Source = @"
 using Spectre.Console;
@@ -18,17 +18,20 @@ class TestClass
     {
         AnsiConsole.Live(new Table()).Start(ctx =>
         {
-            AnsiConsole.Status().Start(""go"", innerCtx => {});
+            [|AnsiConsole.Status().Start(""go"", innerCtx => {})|];
         });
     }
 }";
 
         await SpectreAnalyzerVerifier<NoConcurrentLiveRenderablesAnalyzer>
-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(10, 13));
+            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
+            {
+                { "build_property.enableaotanalyzer", "true" },
+            });
     }
 
     [Fact]
-    public async void Status_call_within_live_call_warns_with_instance()
+    public async Task Status_call_within_live_call_warns_with_instance()
     {
         const string Source = @"
 using Spectre.Console;
@@ -41,17 +44,17 @@ class Child
     {
         _console.Status().Start(""starting"", context =>
         {
-            _console.Progress().Start(progressContext => { });
+            [|_console.Progress().Start(progressContext => { })|];
         });
     }
 }";
 
         await SpectreAnalyzerVerifier<NoConcurrentLiveRenderablesAnalyzer>
-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(12, 13));
+            .VerifyAnalyzerAsync(Source);
     }
 
     [Fact]
-    public async void Calling_start_on_non_live_renderable_has_no_warning()
+    public async Task Calling_start_on_non_live_renderable_has_no_warning()
     {
         const string Source = @"
 using Spectre.Console;

@@ -7,7 +7,7 @@ public class UseSpectreInsteadOfSystemConsoleAnalyzerTests
         DiagnosticSeverity.Warning);
 
     [Fact]
-    public async void Non_configured_SystemConsole_methods_report_no_warnings()
+    public async Task Non_configured_SystemConsole_methods_report_no_warnings()
     {
         const string Source = @"
 using System;
@@ -20,11 +20,14 @@ class TestClass {
 }";
 
         await SpectreAnalyzerVerifier<UseSpectreInsteadOfSystemConsoleAnalyzer>
-            .VerifyAnalyzerAsync(Source);
+            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
+            {
+                { "build_property.enableaotanalyzer", "true" },
+            });
     }
 
     [Fact]
-    public async void Console_Write_Has_Warning()
+    public async Task Console_Write_Has_Warning()
     {
         const string Source = @"
 using System;
@@ -32,16 +35,19 @@ using System;
 class TestClass {
     void TestMethod()
     {
-        Console.Write(""Hello, World"");
+        [|Console.Write(""Hello, World"")|];
     }
 }";
 
         await SpectreAnalyzerVerifier<UseSpectreInsteadOfSystemConsoleAnalyzer>
-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(7, 9));
+            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
+            {
+                { "build_property.enableaotanalyzer", "true" },
+            });
     }
 
     [Fact]
-    public async void Console_WriteLine_Has_Warning()
+    public async Task Console_WriteLine_Has_Warning()
     {
         const string Source = @"
 using System;
@@ -49,11 +55,11 @@ using System;
 class TestClass
 {
     void TestMethod() {
-        Console.WriteLine(""Hello, World"");
+        [|Console.WriteLine(""Hello, World"")|];
     }
 }";
 
         await SpectreAnalyzerVerifier<UseSpectreInsteadOfSystemConsoleAnalyzer>
-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(7, 9));
+            .VerifyAnalyzerAsync(Source);
     }
 }

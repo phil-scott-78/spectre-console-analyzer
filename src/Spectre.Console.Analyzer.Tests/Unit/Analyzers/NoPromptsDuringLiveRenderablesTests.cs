@@ -21,7 +21,10 @@ class TestClass
 }";
 
         await SpectreAnalyzerVerifier<NoPromptsDuringLiveRenderablesAnalyzer>
-            .VerifyAnalyzerAsync(Source);
+            .VerifyAnalyzerAsync(Source, new Dictionary<string, string>
+            {
+                { "build_property.enableaotanalyzer", "true" },
+            });
     }
 
     [Fact]
@@ -38,13 +41,13 @@ class TestClass
     {
         _console.Status().Start(""starting"", context =>
         {
-            var result = _console.Confirm(""we ok?"");
+            var result = [|_console.Confirm(""we ok?"")|];
         });
     }
 }";
 
         await SpectreAnalyzerVerifier<NoPromptsDuringLiveRenderablesAnalyzer>
-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(12, 26));
+            .VerifyAnalyzerAsync(Source);
     }
 
     [Fact]
@@ -59,13 +62,13 @@ class TestClass
     {
         AnsiConsole.Progress().Start(_ =>
         {
-            AnsiConsole.Ask<string>(""How are you?"");
+            [|AnsiConsole.Ask<string>(""How are you?"")|];
         });
     }
 }";
 
         await SpectreAnalyzerVerifier<NoPromptsDuringLiveRenderablesAnalyzer>
-            .VerifyAnalyzerAsync(Source, _expectedDiagnostics.WithLocation(10, 13));
+            .VerifyAnalyzerAsync(Source);
     }
 
     [Fact]

@@ -73,4 +73,37 @@ public static class Descriptors
             Usage,
             Warning,
             "Avoid prompting for input while a current renderable is running.");
+
+    /// <summary>
+    /// Gets definitions of diagnostics Spectre1050.
+    /// </summary>
+    public static DiagnosticDescriptor S1050_AotRequiresType { get; } =
+        Rule(
+            "Spectre1050",
+            "Types must be explicitly defined when using non-intrinsic properties while publishing in AOT.",
+            Usage,
+            Warning,
+            "Types must be explicitly defined on CommandArgument or CommandOption when using non-intrinsic properties while publish in AOT. ");
+
+    /// <summary>
+    /// Gets definitions of diagnostics Spectre1051.
+    /// </summary>
+    public static DiagnosticDescriptor S1051_AotRequiresMatchTypes { get; } =
+        Rule(
+            "Spectre1051",
+            "Type must match the property type.",
+            Usage,
+            Warning,
+            "Type must match the property type. {0} expected {1}, found {2}");
+
+    /// <summary>
+    /// Gets definitions of diagnostics Spectre1052.
+    /// </summary>
+    public static DiagnosticDescriptor S1052_InvalidCommandSettingPropertyType { get; } =
+        Rule(
+            id: "S1052",
+            title: "Invalid property type for CommandArgument or CommandOption",
+            Usage,
+            Error,
+            messageFormat: "The property '{0}' of type '{1}' is not a valid option type for Spectre.Console commands. {2}");
 }
